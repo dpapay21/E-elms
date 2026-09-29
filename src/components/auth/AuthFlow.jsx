@@ -2,7 +2,12 @@
 import React, { useMemo, useRef, useState } from "react";
 import ministryLogo from "../../assets/ministry-logo.jpg";
 import landingLogo from "../../assets/877d674005f4.png";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../../lib/firebase.js";
+import { submitEmploymentApplication } from "../../services/employmentApplications.js";
 import "./AuthFlow.css";
+import WorkStatusStep from "./WorkStatusStep.jsx";
+import EmploymentRegistrationForm from "./EmploymentRegistrationForm.jsx";
 
 /**
  * E-LMIS style Login / Register page
@@ -355,7 +360,7 @@ function LoginForm({ form, update, blur, shown, showPassword, setShowPassword, o
   );
 }
 
-function RegisterForm({ form, update, blur, shown, showPassword, setShowPassword, showConfirm, setShowConfirm, onSubmit, submitting, switchMode }) {
+function RegisterForm({ form, update, blur, shown, showPassword, setShowPassword, showConfirm, setShowConfirm, onSubmit, submitting, switchMode, statusMessage }) {
   return (
     <div onKeyDown={submitOnEnter(onSubmit)} className="px-6 py-10 sm:px-10 md:px-12">
       <h1 className="mb-1 text-center text-3xl font-bold" style={{ color: BLUE }}>
@@ -399,6 +404,8 @@ function RegisterForm({ form, update, blur, shown, showPassword, setShowPassword
           onToggle={() => setShowConfirm((s) => !s)}
         />
       </div>
+
+      {statusMessage && <p className="mb-4 text-sm text-red-500" role="status" aria-live="polite">{statusMessage}</p>}
 
       <button
         type="button"
@@ -567,125 +574,6 @@ function OtpStep({ phone, onVerified, onEditPhone }) {
 
 
 
-/* ---------- work-status modal ----------
- * Matches the "Tell us about your current work status" screenshot.
- * The Amharic copy below is transcribed by eye from that screenshot —
- * please double-check it against your actual CMS/translation strings
- * before shipping, since screenshot transcription of Amharic script
- * can introduce small errors. */
-
-const WORK_STATUS_OPTIONS = [
-  {
-    id: "working_open",
-    title: "Working & Open to work",
-    desc: "Currently employed or engaged in a specific job or project and I am actively seeking or considering new work opportunities.",
-    amTitle: "አየሰራሁ ነው እና ለአዲስ ስራ ክፍት ነኝ",
-    amDesc:
-      "በአሁኑ ጊዜ ተቀጥሬ ወይም በአንድ የተወሰነ ስራ ወይም ፕሮጀክት ላይ የተሰማራሁ እና አዲስ የስራ እድሎችን በንቃት የፈልጋለሁ ወይም እያሰብኩ ነው።",
-  },
-  {
-    id: "working_not_open",
-    title: "Working but not open to work",
-    desc: "Currently employed or engaged in a specific job or project and I am not actively seeking or considering new work opportunities.",
-    amTitle: "አየሰራሁ ነው እና ለአዲስ ስራ ክፍት አይደለሁም",
-    amDesc:
-      "በአሁኑ ጊዜ ተቀጥሬ ወይም በአንድ የተወሰነ ስራ ወይም ፕሮጀክት ላይ የተሰማራሁ እና አዲስ የስራ እድሎችን በንቃት የማልፈልግ ወይም አላስብም።",
-  },
-  {
-    id: "not_working_open",
-    title: "Not Working & Open to work",
-    desc: "Currently not employed or engaged in a specific job or project and I am actively seeking or considering new work opportunities.",
-    amTitle: "የስራ አይደለም እና ለአዲስ ስራ ክፍት ነኝ",
-    amDesc:
-      "በአሁኑ ጊዜ ተቀጥሬ ወይም በአንድ የተወሰነ ስራ ወይም ፕሮጀክት ላይ ያልተሰማራሁ እና አዲስ የስራ እድሎችን በንቃት የፈልጋለሁ ወይም እያሰብኩ ነው።",
-  },
-  {
-    id: "not_working_not_open",
-    title: "Not Working but not open to work",
-    desc: "currently not employed or engaged in a specific job or project and I am not actively seeking or considering new work opportunities.",
-    amTitle: "የስራ አይደለም እና ለአዲስ ስራ ክፍት አይደለሁም",
-    amDesc:
-      "በአሁኑ ጊዜ ተቀጥሬ ወይም በአንድ የተወሰነ ስራ ወይም ፕሮጀክት ላይ ያልተሰማራሁ እና አዲስ የስራ እድሎችን በንቃት የማልፈልግ ወይም አላስብም።",
-  },
-];
-
-function BriefcaseIcon(props) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="2" y="7" width="20" height="14" rx="2" />
-      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-      <path d="M2 13h20" />
-    </svg>
-  );
-}
-
-function WorkStatusModal({ onDone }) {
-  const [selected, setSelected] = useState(null);
-  const [saving, setSaving] = useState(false);
-
-  function handleContinue() {
-    if (!selected) return;
-    setSaving(true);
-    setTimeout(onDone, 700); // demo only — wire to your real "save profile" call
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center">
-      <div className="my-8 w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl sm:p-8">
-        <div className="mb-5 flex items-center gap-3">
-          <span style={{ color: BLUE_BTN }}>
-            <BriefcaseIcon />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">Tell us about your current work status</h2>
-            <div className="mt-1 h-0.5 w-40 rounded-full" style={{ backgroundColor: "#5ED9C0" }} />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          {WORK_STATUS_OPTIONS.map((opt) => {
-            const isSelected = selected === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setSelected(opt.id)}
-                className={
-                  "rounded-xl border p-4 text-left transition-colors " +
-                  (isSelected ? "border-blue-500 ring-1 ring-blue-200" : "border-slate-200 hover:border-slate-300")
-                }
-              >
-                <div className="font-semibold" style={{ color: BLUE }}>
-                  {opt.title}
-                </div>
-                <p className="mt-1 text-sm text-slate-500">{opt.desc}</p>
-                <div className="my-2 h-px w-24 bg-slate-200" />
-                <div className="text-sm font-medium" style={{ color: BLUE }}>
-                  {opt.amTitle}
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">{opt.amDesc}</p>
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={!selected || saving}
-          className="mt-6 w-full rounded-lg py-3 text-sm font-semibold text-white transition-colors disabled:opacity-40"
-          style={{ backgroundColor: BLUE_BTN }}
-        >
-          {saving ? "Saving..." : "Continue"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-
-
-
 /* ---------- page ---------- */
 
 function AuthPage({ navigate, routeState, initialMode }) {
@@ -741,7 +629,7 @@ function AuthPage({ navigate, routeState, initialMode }) {
     setForm({ email: "", phone: "", password: "", confirm: "" });
   }
 
-  function handleSubmit(ev) {
+  async function handleSubmit(ev) {
     ev.preventDefault();
     setSubmitted(true);
     setTouched({ email: true, phone: true, password: true, confirm: true });
@@ -749,12 +637,31 @@ function AuthPage({ navigate, routeState, initialMode }) {
     setSubmitting(true);
 
     if (mode === "signup") {
-      // Simulate account creation, then route to the OTP confirmation
-      // page. Wire this to your real "create account" API call instead.
-      setTimeout(() => {
-        setSubmitting(false);
+      try {
+        if (!auth.currentUser || auth.currentUser.email !== form.email) {
+          await createUserWithEmailAndPassword(auth, form.email, form.password);
+        }
         navigate("/auth/otp-confirmation", { state: { phone: form.phone, email: form.email } });
-      }, 900);
+      } catch (error) {
+        const messages = {
+          "auth/email-already-in-use": "An account already exists for this email. Sign in or use a different email.",
+          "auth/invalid-email": "Enter a valid email address.",
+          "auth/weak-password": "Choose a stronger password. Use at least 8 characters.",
+          "auth/network-request-failed": "Could not reach Firebase. Check your internet connection and try again.",
+          "auth/operation-not-allowed": "Email and password registration is disabled in Firebase. Enable Email/Password under Authentication → Sign-in method.",
+          "auth/unauthorized-domain": "This site is not authorized to use Firebase Authentication. Add this site's domain under Authentication → Settings → Authorized domains.",
+          "auth/configuration-not-found": "Firebase Authentication is not configured for this project. Check the Firebase project settings.",
+          "auth/invalid-api-key": "Firebase rejected the app configuration. Check the Firebase API key and project settings.",
+          "auth/password-does-not-meet-requirements": "Choose a password that meets the Firebase password requirements.",
+          "auth/too-many-requests": "Too many signup attempts. Wait a little and try again.",
+        };
+        // Keep the useful Firebase code visible when an unrecognized project or
+        // deployment setting blocks signup, without exposing form data.
+        console.error("Firebase signup failed:", error.code || error.message);
+        setLoginMessage(messages[error.code] || `Account creation failed (${error.code || "unknown error"}). Please try again or contact the site administrator.`);
+      } finally {
+        setSubmitting(false);
+      }
     } else {
       // There is no authentication API in this project yet. Keep the
       // validated form in place and tell the user why it cannot continue.
@@ -802,6 +709,7 @@ function AuthPage({ navigate, routeState, initialMode }) {
               onSubmit={handleSubmit}
               submitting={submitting}
               switchMode={switchMode}
+              statusMessage={loginMessage}
             />
           )}
         </div>
@@ -826,15 +734,32 @@ function OtpConfirmationPage({ navigate, routeState }) {
   const phone = routeState?.phone || "";
   const email = routeState?.email || "";
   const [showWorkStatus, setShowWorkStatus] = useState(false);
+  const [workStatus, setWorkStatus] = useState(null);
 
   function handleEditPhone() {
     // carry email + phone back so the Register form isn't wiped
     navigate("/register", { state: { fromOtp: true, email, phone } });
   }
 
-  function handleWorkStatusDone() {
+  function handleWorkStatusDone(status) {
     setShowWorkStatus(false);
-    navigate("/login"); // adjust to your app's post-signup destination
+    setWorkStatus(status);
+  }
+
+  if (workStatus) {
+    return (
+      <EmploymentRegistrationForm
+        workStatus={workStatus}
+        phone={phone}
+        email={email}
+        onComplete={submitEmploymentApplication}
+        onBack={() => {
+          setWorkStatus(null);
+          setShowWorkStatus(true);
+        }}
+        onFinish={() => navigate("/login")}
+      />
+    );
   }
 
   return (
@@ -842,7 +767,7 @@ function OtpConfirmationPage({ navigate, routeState }) {
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         <OtpStep phone={phone} onVerified={() => setShowWorkStatus(true)} onEditPhone={handleEditPhone} />
       </div>
-      {showWorkStatus && <WorkStatusModal onDone={handleWorkStatusDone} />}
+      {showWorkStatus && <WorkStatusStep onDone={handleWorkStatusDone} />}
     </div>
   );
 }
