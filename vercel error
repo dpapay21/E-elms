@@ -1,0 +1,35 @@
+
+
+13:30:49.508 Running build in Washington, D.C., USA (East) – iad1
+13:30:49.509 Build machine configuration: 2 cores, 8 GB
+13:30:49.729 Cloning github.com/B21Boy/lmis.gov.ett (Branch: main, Commit: 87cb116)
+13:30:49.731 Previous build caches not available.
+13:30:50.356 Cloning completed: 627.000ms
+13:30:51.135 Running "vercel build"
+13:30:51.156 Vercel CLI 60.1.3
+13:30:52.264 Installing dependencies...
+13:30:59.728 
+13:30:59.728 added 150 packages in 7s
+13:30:59.729 
+13:30:59.729 12 packages are looking for funding
+13:30:59.729   run `npm fund` for details
+13:30:59.730 npm warn install-scripts 3 packages have install scripts not yet covered by allowScripts:
+13:30:59.731 npm warn install-scripts   @firebase/util@1.15.3 (postinstall: node ./postinstall.js)
+13:30:59.731 npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
+13:30:59.731 npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+13:30:59.732 npm warn install-scripts
+13:30:59.732 npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+13:30:59.818 Running "npm run build"
+13:31:00.053 
+13:31:00.054 > e-elms@0.0.0 build
+13:31:00.054 > vite build
+13:31:00.054 
+13:31:00.453 failed to load config from /vercel/path0/vite.config.js
+13:31:00.457 error during build:
+13:31:00.458 Error: Cannot build E-LMIS: configure VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in the deployment environment. For Vercel, add them under Project Settings → Environment Variables and redeploy.
+13:31:00.458     at file:///vercel/path0/node_modules/.vite-temp/vite.config.js.timestamp-1790764260438-4f060c47e2b7f.mjs:9:13
+13:31:00.458     at loadConfigFromFile (file:///vercel/path0/node_modules/vite/dist/node/chunks/config.js:35853:64)
+13:31:00.458     at async resolveConfig (file:///vercel/path0/node_modules/vite/dist/node/chunks/config.js:35500:22)
+13:31:00.458     at async createBuilder (file:///vercel/path0/node_modules/vite/dist/node/chunks/config.js:33955:19)
+13:31:00.458     at async CAC.<anonymous> (file:///vercel/path0/node_modules/vite/dist/node/cli.js:629:10)
+13:31:00.487 Error: Command "npm run build" exited with 1

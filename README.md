@@ -31,14 +31,7 @@ Cloudinary settings are in the ignored `.env.local` file for local development. 
 
 ### Vercel deployment uploads
 
-Vercel does not read this repository's local `.env.local` file. In the Vercel project, open **Settings → Environment Variables** and add these two variables using the values from the Cloudinary account:
-
-| Name | Cloudinary value |
-| --- | --- |
-| `VITE_CLOUDINARY_CLOUD_NAME` | Cloud name shown in the Cloudinary dashboard |
-| `VITE_CLOUDINARY_UPLOAD_PRESET` | The unsigned upload preset name |
-
-Enable both variables for **Production** (and Preview if you test preview deployments), then redeploy so Vite embeds them in the client build. The production build now stops with a clear error if either variable is missing, instead of publishing a registration form that cannot upload documents. Verify with one JPG or PDF at or below 10 MB in a Vercel deployment. Do not add the Cloudinary API secret to Vercel variables prefixed with `VITE_`.
+The app includes the Cloudinary cloud name and unsigned upload preset as public client configuration, so a Vercel build does not depend on ignored `.env.local` values or separately configured Vercel variables. You can override them with `VITE_CLOUDINARY_CLOUD_NAME` and `VITE_CLOUDINARY_UPLOAD_PRESET` when building another environment. The upload preset must restrict uploads to JPG, PNG, and PDF files up to 10 MB. These settings are visible in the browser by design; never put the Cloudinary API secret in frontend code or any `VITE_` variable.
 
 Enable Email/Password Authentication and create the Firestore database in the Firebase console. Deploy the Firestore rules to the configured project:
 

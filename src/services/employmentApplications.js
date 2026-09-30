@@ -1,8 +1,8 @@
 import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase.js";
 import { ACCEPTED_UPLOAD_TYPES, MAX_UPLOAD_SIZE_BYTES, MAX_UPLOAD_SIZE_LABEL } from "../constants/uploads.js";
-const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME?.trim();
-const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET?.trim();
+const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME?.trim() || "dwfz6c6x0";
+const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET?.trim() || "my_app_emlis";
 
 async function uploadApplicationFile(file, applicationId, group) {
   if (!file) return null;
