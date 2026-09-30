@@ -27,7 +27,18 @@ src/
 
 The Firebase web configuration and shared SDK instances are in `src/lib/firebase.js`. A completed signup creates an Email/Password Firebase Authentication account, uploads the profile photo and documents to Cloudinary, then creates an `applications/{id}` Firestore document. Applicant data is grouped into `personalInformation`, `address`, `contact`, `jobPreferences`, `salaryBenefits`, and `documents`. Each uploaded file record stores its secure Cloudinary URL, public ID, original filename, content type, and size.
 
-Cloudinary settings are in the ignored `.env.local` file. For a new environment, copy `.env.example` to `.env.local` and set `VITE_CLOUDINARY_CLOUD_NAME` and `VITE_CLOUDINARY_UPLOAD_PRESET`, then restart Vite. The preset must allow unsigned uploads and accept JPG, PNG, and PDF files up to 10 MB. Never put the Cloudinary API secret in a `VITE_` variable or frontend code.
+Cloudinary settings are in the ignored `.env.local` file for local development. For a new environment, copy `.env.example` to `.env.local` and set `VITE_CLOUDINARY_CLOUD_NAME` and `VITE_CLOUDINARY_UPLOAD_PRESET`, then restart Vite. The preset must allow unsigned uploads and accept JPG, PNG, and PDF files up to 10 MB. Never put the Cloudinary API secret in a `VITE_` variable or frontend code.
+
+### Vercel deployment uploads
+
+Vercel does not read this repository's local `.env.local` file. In the Vercel project, open **Settings → Environment Variables** and add these two variables using the values from the Cloudinary account:
+
+| Name | Cloudinary value |
+| --- | --- |
+| `VITE_CLOUDINARY_CLOUD_NAME` | Cloud name shown in the Cloudinary dashboard |
+| `VITE_CLOUDINARY_UPLOAD_PRESET` | The unsigned upload preset name |
+
+Enable both variables for **Production** (and Preview if you test preview deployments), then redeploy so Vite embeds them in the client build. The production build now stops with a clear error if either variable is missing, instead of publishing a registration form that cannot upload documents. Verify with one JPG or PDF at or below 10 MB in a Vercel deployment. Do not add the Cloudinary API secret to Vercel variables prefixed with `VITE_`.
 
 Enable Email/Password Authentication and create the Firestore database in the Firebase console. Deploy the Firestore rules to the configured project:
 
