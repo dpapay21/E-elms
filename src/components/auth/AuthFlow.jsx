@@ -2,12 +2,14 @@
 import React, { useMemo, useRef, useState } from "react";
 import ministryLogo from "../../assets/ministry-logo.jpg";
 import landingLogo from "../../assets/877d674005f4.png";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "../../lib/firebase.js";
+import { isConfiguredAdmin } from "../../admin/adminAccess.js";
 import { submitEmploymentApplication } from "../../services/employmentApplications.js";
 import "./AuthFlow.css";
 import WorkStatusStep from "./WorkStatusStep.jsx";
 import EmploymentRegistrationForm from "./EmploymentRegistrationForm.jsx";
+import LoadingTransition from "./LoadingTransition.jsx";
 
 /**
  * E-LMIS style Login / Register page
@@ -63,6 +65,29 @@ function validateConfirm(password, confirm) {
   if (!confirm) return "Confirm your password.";
   if (password !== confirm) return "Passwords do not match.";
   return "";
+}
+
+function getLoginErrorMessage(error) {
+  switch (error?.code) {
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found":
+      return "We couldn’t sign you in with those details. Check your email and password, then try again.";
+    case "auth/invalid-email":
+      return "Enter a valid email address and try again.";
+    case "auth/user-disabled":
+      return "This account is currently unavailable. Contact support for help.";
+    case "auth/too-many-requests":
+      return "There have been too many sign-in attempts. Wait a few minutes, then try again.";
+    case "auth/network-request-failed":
+      return "We couldn’t connect to the sign-in service. Check your internet connection and try again.";
+    case "auth/operation-not-allowed":
+    case "auth/configuration-not-found":
+    case "auth/invalid-api-key":
+      return "Sign-in is temporarily unavailable. Please try again later or contact support.";
+    default:
+      return "We couldn’t sign you in right now. Please try again.";
+  }
 }
 
 const BLUE = "#2E6199";
@@ -314,7 +339,7 @@ function LoginForm({ form, update, blur, shown, showPassword, setShowPassword, o
       </p>
 
       <div className="mb-3">
-        <FloatPhoneField value={form.phone} onChange={update("phone")} onBlur={blur("phone")} error={shown("phone")} />
+        <FloatField label="Email address" type="email" value={form.email} onChange={update("email")} onBlur={blur("email")} error={shown("email")} />
       </div>
 
       <div className="mb-2">
@@ -599,9 +624,9 @@ function AuthPage({ navigate, routeState, initialMode }) {
   const [touched, setTouched] = useState({});
 
   const errors = useMemo(() => {
-    const e = { phone: validatePhone(form.phone), password: validatePassword(form.password) };
+    const e = { email: validateEmail(form.email), password: validatePassword(form.password) };
     if (mode === "signup") {
-      e.email = validateEmail(form.email);
+      e.phone = validatePhone(form.phone);
       e.confirm = validateConfirm(form.password, form.confirm);
     }
     return e;
@@ -614,7 +639,7 @@ function AuthPage({ navigate, routeState, initialMode }) {
     if (field === "phone") {
       value = value.replace(/\D/g, "");
       if (value.startsWith("251")) value = value.slice(3);
-      value = value.slice(0, 9);
+      value = mode === "login" && value.startsWith("0") ? value.slice(0, 10) : value.slice(0, 9);
     }
     setForm((f) => ({ ...f, [field]: value }));
   };
@@ -663,10 +688,21 @@ function AuthPage({ navigate, routeState, initialMode }) {
         setSubmitting(false);
       }
     } else {
-      // There is no authentication API in this project yet. Keep the
-      // validated form in place and tell the user why it cannot continue.
-      setSubmitting(false);
-      setLoginMessage("Sign-in is not available yet. Please try again later.");
+      try {
+        const normalizedEmail = form.email.trim().toLowerCase();
+
+        const credential = await signInWithEmailAndPassword(auth, normalizedEmail, form.password);
+        if (!isConfiguredAdmin(credential.user)) {
+          await signOut(auth);
+          setLoginMessage("This account signed in, but it is not authorized as an administrator.");
+          return;
+        }
+        navigate("/admin");
+      } catch (error) {
+        setLoginMessage(getLoginErrorMessage(error));
+      } finally {
+        setSubmitting(false);
+      }
     }
   }
 
@@ -735,6 +771,10 @@ function OtpConfirmationPage({ navigate, routeState }) {
   const email = routeState?.email || "";
   const [showWorkStatus, setShowWorkStatus] = useState(false);
   const [workStatus, setWorkStatus] = useState(null);
+  const [transitionLabel, setTransitionLabel] = useState("");
+  const transitionTimer = useRef(null);
+
+  React.useEffect(() => () => window.clearTimeout(transitionTimer.current), []);
 
   function handleEditPhone() {
     // carry email + phone back so the Register form isn't wiped
@@ -742,32 +782,54 @@ function OtpConfirmationPage({ navigate, routeState }) {
   }
 
   function handleWorkStatusDone(status) {
-    setShowWorkStatus(false);
-    setWorkStatus(status);
+    setTransitionLabel("Opening personal information");
+    transitionTimer.current = window.setTimeout(() => {
+      setShowWorkStatus(false);
+      setWorkStatus(status);
+      setTransitionLabel("");
+    }, 360);
+  }
+
+  function returnToWorkStatus() {
+    setTransitionLabel("Returning to work status");
+    transitionTimer.current = window.setTimeout(() => {
+      setWorkStatus(null);
+      setShowWorkStatus(true);
+      setTransitionLabel("");
+    }, 360);
+  }
+
+  function handleOtpVerified() {
+    setTransitionLabel("Verification complete");
+    transitionTimer.current = window.setTimeout(() => {
+      setShowWorkStatus(true);
+      setTransitionLabel("");
+    }, 360);
   }
 
   if (workStatus) {
     return (
+      <>
       <EmploymentRegistrationForm
         workStatus={workStatus}
         phone={phone}
         email={email}
         onComplete={submitEmploymentApplication}
-        onBack={() => {
-          setWorkStatus(null);
-          setShowWorkStatus(true);
-        }}
+        onBack={returnToWorkStatus}
         onFinish={() => navigate("/login")}
       />
+      <LoadingTransition label={transitionLabel} />
+      </>
     );
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 sm:p-6">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <OtpStep phone={phone} onVerified={() => setShowWorkStatus(true)} onEditPhone={handleEditPhone} />
+        <OtpStep phone={phone} onVerified={handleOtpVerified} onEditPhone={handleEditPhone} />
       </div>
       {showWorkStatus && <WorkStatusStep onDone={handleWorkStatusDone} />}
+      <LoadingTransition label={transitionLabel} />
     </div>
   );
 }
@@ -776,13 +838,36 @@ function OtpConfirmationPage({ navigate, routeState }) {
 
 export default function AuthFlow({ onExit, initialMode = "login" }) {
   const [route, setRoute] = useState({ path: "/login", state: null });
-  const navigate = (path, opts) => setRoute({ path, state: (opts && opts.state) || null });
+  const [transitionLabel, setTransitionLabel] = useState("");
+  const transitionTimer = useRef(null);
+
+  React.useEffect(() => () => window.clearTimeout(transitionTimer.current), []);
+
+  const navigate = (path, opts) => {
+    window.clearTimeout(transitionTimer.current);
+    if (path === "/admin") {
+      setTransitionLabel("Opening administrator dashboard");
+      transitionTimer.current = window.setTimeout(() => {
+        window.history.pushState({}, "", "/admin");
+        window.dispatchEvent(new CustomEvent("e-elms:navigate", { detail: "/admin" }));
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        setTransitionLabel("");
+      }, 360);
+      return;
+    }
+    setTransitionLabel(path === "/auth/otp-confirmation" ? "Opening verification" : path === "/login" ? "Finishing registration" : "Returning to registration");
+    transitionTimer.current = window.setTimeout(() => {
+      setRoute({ path, state: (opts && opts.state) || null });
+      setTransitionLabel("");
+    }, 360);
+  };
 
   return (
     <div className="auth-flow">
       {route.path === "/auth/otp-confirmation"
         ? <OtpConfirmationPage navigate={navigate} routeState={route.state} />
         : <AuthPage navigate={navigate} routeState={route.state} initialMode={initialMode} />}
+      <LoadingTransition label={transitionLabel} />
     </div>
   );
 }

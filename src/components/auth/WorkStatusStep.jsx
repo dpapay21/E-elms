@@ -62,7 +62,7 @@ export default function WorkStatusStep({ onDone }) {
   function handleContinue() {
     if (!selected) return;
     setSaving(true);
-    setTimeout(() => onDone(selected), 700); // demo only — wire to your real "save profile" call
+    onDone(selected);
   }
 
   return (
@@ -118,7 +118,6 @@ export default function WorkStatusStep({ onDone }) {
     </div>
   );
 }
-
 
 
 

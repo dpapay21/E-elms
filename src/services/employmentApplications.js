@@ -1,15 +1,13 @@
 import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase.js";
-
-const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
-const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
+import { ACCEPTED_UPLOAD_TYPES, MAX_UPLOAD_SIZE_BYTES, MAX_UPLOAD_SIZE_LABEL } from "../constants/uploads.js";
 const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME?.trim();
 const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET?.trim();
 
 async function uploadApplicationFile(file, applicationId, group) {
   if (!file) return null;
-  if (!ACCEPTED_TYPES.has(file.type) || file.size > MAX_UPLOAD_SIZE) {
-    throw new Error(`${file.name} must be a JPG, PNG, or PDF under 5 MB.`);
+  if (!ACCEPTED_UPLOAD_TYPES.has(file.type) || file.size > MAX_UPLOAD_SIZE_BYTES) {
+    throw new Error(`${file.name} must be a JPG, PNG, or PDF no larger than ${MAX_UPLOAD_SIZE_LABEL}.`);
   }
 
   if (!cloudinaryCloudName || !cloudinaryUploadPreset) {
@@ -20,13 +18,18 @@ async function uploadApplicationFile(file, applicationId, group) {
   formData.append("file", file);
   formData.append("upload_preset", cloudinaryUploadPreset);
   formData.append("folder", `applications/${applicationId}/${group}`);
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudinaryCloudName)}/auto/upload`, {
-    method: "POST",
-    body: formData,
-  });
+  let response;
+  try {
+    response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudinaryCloudName)}/auto/upload`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (error) {
+    throw new Error(`Cloudinary upload failed: ${error?.message || "network error"}`);
+  }
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.secure_url || !result.public_id) {
-    throw new Error(result.error?.message || "A document could not be uploaded to Cloudinary.");
+    throw new Error(`Cloudinary upload failed: ${result.error?.message || "the upload service rejected the file"}`);
   }
   return {
     provider: "cloudinary",

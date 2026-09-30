@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { applicants } from '../../data/applicants.js';
+import { useEffect, useMemo, useState } from 'react';
+import { watchApprovedApplicants } from '../../services/approvedApplicants.js';
 import '../../styles/landing.css';
 
 const colors = [
@@ -9,19 +9,27 @@ const colors = [
 
 function ApplicantCard({ applicant, expanded, onToggle }) {
   const initials = applicant.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('');
-  const hue = colors[applicant.id % colors.length];
+  const colorIndex = typeof applicant.id === 'number'
+    ? applicant.id
+    : [...String(applicant.id)].reduce((total, character) => total + character.charCodeAt(0), 0);
+  const hue = colors[colorIndex % colors.length];
   return (
     <article className="ap-card">
       <div className="ap-main">
         <div className="ap-avatar">
-          <span className="ap-ini" style={{ background: `linear-gradient(135deg, ${hue[0]}, ${hue[1]})` }}>{initials}</span>
+          {applicant.photoUrl
+            ? <img className="ap-profile-photo" src={applicant.photoUrl} alt={`${applicant.name} profile`} loading="lazy" />
+            : <span className="ap-ini" style={{ background: `linear-gradient(135deg, ${hue[0]}, ${hue[1]})` }}>{initials}</span>}
           <span className="ap-check" aria-hidden="true">✓</span>
         </div>
         <div className="ap-info">
           <h3 className="ap-name">{applicant.name}</h3>
           <ul className="ap-meta"><li>▣ <span>{applicant.job}</span></li><li>⌖ <span>{applicant.country}</span></li><li className="ap-pay">$ <span>{applicant.pay.toLocaleString('en-US')}</span></li></ul>
           <div className="ap-foot"><span className="ap-status">Accepted</span><button className="ap-view" type="button" aria-expanded={expanded} onClick={onToggle}>View Details</button></div>
-          {expanded && <p className="ap-details">Placed: {applicant.placed} · Reference: {applicant.reference}</p>}
+          {expanded && <div className="ap-details">
+            {applicant.photoUrl && <img className="ap-detail-photo" src={applicant.photoUrl} alt={`${applicant.name} profile`} />}
+            <div><b>Accepted applicant</b><span>Placed: {applicant.placed}</span><span>Reference: {applicant.reference}</span></div>
+          </div>}
         </div>
       </div>
     </article>
@@ -33,12 +41,26 @@ export default function Ap() {
   const [sort, setSort] = useState('recent');
   const [shown, setShown] = useState(9);
   const [expanded, setExpanded] = useState(() => new Set());
+  const [approvedApplicants, setApprovedApplicants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => watchApprovedApplicants((rows) => {
+    setApprovedApplicants(rows);
+    setLoading(false);
+    setLoadError(false);
+  }, (error) => {
+    console.error('Could not load approved applicants:', error?.code || error?.message);
+    setLoading(false);
+    setLoadError(true);
+  }), []);
+
   const rows = useMemo(() => {
-    const filtered = applicants.filter(({ name, country, job }) => `${name} ${country} ${job}`.toLowerCase().includes(query.trim().toLowerCase()));
+    const filtered = approvedApplicants.filter(({ name, country, job }) => `${name} ${country} ${job}`.toLowerCase().includes(query.trim().toLowerCase()));
     if (sort === 'name') return filtered.sort((a, b) => a.name.localeCompare(b.name));
-    if (sort === 'salary') return filtered.sort((a, b) => b.pay - a.pay || a.id - b.id);
+    if (sort === 'salary') return filtered.sort((a, b) => b.pay - a.pay || a.name.localeCompare(b.name));
     return filtered;
-  }, [query, sort]);
+  }, [approvedApplicants, query, sort]);
   const visible = rows.slice(0, shown);
   const toggle = (id) => setExpanded((current) => {
     const next = new Set(current);
@@ -49,12 +71,14 @@ export default function Ap() {
   return (
     <section className="ap" id="applicants" aria-labelledby="apTitle">
       <h2 className="ap-title" id="apTitle">Applicant Status Directory</h2>
-      <p className="ap-copy">Search and view the status of job applications. Track your application progress or find inspiration through successful placements.</p>
+      <p className="ap-copy">Browse accepted applicant profiles. This directory updates when an administrator approves an application.</p>
       <div className="ap-inner">
         <div className="ap-search-card"><label className="sr-only" htmlFor="apSearch">Search applicants by name or country</label><div className="ap-search"><input id="apSearch" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setShown(9); }} placeholder="Search by name, country" autoComplete="off" /></div></div>
-        <div className="ap-bar"><p className="ap-count" aria-live="polite">Showing <b>{visible.length}</b> of <b>{rows.length}</b> applicants</p><div className="ap-sort"><label htmlFor="apSort">Sort by:</label><select id="apSort" value={sort} onChange={(event) => { setSort(event.target.value); setShown(9); }}><option value="recent">Most Recent</option><option value="name">Name (A–Z)</option><option value="salary">Highest Salary</option></select></div></div>
+        <div className="ap-bar"><p className="ap-count" aria-live="polite">Showing <b>{visible.length}</b> of <b>{rows.length}</b> accepted applicants</p><div className="ap-sort"><label htmlFor="apSort">Sort by:</label><select id="apSort" value={sort} onChange={(event) => { setSort(event.target.value); setShown(9); }}><option value="recent">Most Recent</option><option value="name">Name (A–Z)</option><option value="salary">Highest Salary</option></select></div></div>
         <div className="ap-list">{visible.map((applicant) => <ApplicantCard key={applicant.id} applicant={applicant} expanded={expanded.has(applicant.id)} onToggle={() => toggle(applicant.id)} />)}</div>
-        {rows.length === 0 && <p className="ap-empty">No applicants match your search.</p>}
+        {loading && <p className="ap-empty" role="status">Loading accepted applicants…</p>}
+        {!loading && loadError && <p className="ap-empty" role="alert">Accepted applicants could not be loaded. Please try again later.</p>}
+        {!loading && !loadError && rows.length === 0 && <p className="ap-empty">{query ? 'No accepted applicants match your search.' : 'No accepted applicants are available yet.'}</p>}
         {visible.length < rows.length && <button className="ap-more" type="button" onClick={() => setShown((count) => count + 9)}>Load More Applicants <span aria-hidden="true">→</span></button>}
       </div>
     </section>

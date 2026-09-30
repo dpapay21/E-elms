@@ -1,0 +1,99 @@
+.brand-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(247 250 253 / 96%);
+  backdrop-filter: blur(7px);
+  animation: brand-transition-enter 180ms ease-out both;
+}
+
+.brand-transition-content {
+  display: flex;
+  min-width: 190px;
+  flex-direction: column;
+  align-items: center;
+  color: #2e6199;
+}
+
+.brand-transition-mark {
+  position: relative;
+  display: grid;
+  width: 82px;
+  height: 82px;
+  place-items: center;
+  margin-bottom: 13px;
+}
+
+.brand-transition-mark img {
+  position: relative;
+  z-index: 1;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  animation: brand-transition-float 1.5s ease-in-out infinite;
+}
+
+.brand-transition-ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid #d9e7f4;
+  border-top-color: #3170b5;
+  border-right-color: #67b7b4;
+  border-radius: 50%;
+  animation: brand-transition-spin 1.05s linear infinite;
+}
+
+.brand-transition-content > strong {
+  color: #2e3192;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.brand-transition-label {
+  margin-top: 7px;
+  color: #68798b;
+  font-size: 13px;
+}
+
+.brand-transition-progress {
+  width: 126px;
+  height: 3px;
+  overflow: hidden;
+  margin-top: 18px;
+  border-radius: 3px;
+  background: #e2eaf2;
+}
+
+.brand-transition-progress i {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3170b5, #67b7b4);
+  animation: brand-transition-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes brand-transition-spin { to { transform: rotate(360deg); } }
+@keyframes brand-transition-float { 50% { transform: translateY(-3px) scale(1.04); } }
+@keyframes brand-transition-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(250%); }
+}
+@keyframes brand-transition-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-transition,
+  .brand-transition-mark img,
+  .brand-transition-ring,
+  .brand-transition-progress i {
+    animation-duration: .01ms;
+    animation-iteration-count: 1;
+  }
+}

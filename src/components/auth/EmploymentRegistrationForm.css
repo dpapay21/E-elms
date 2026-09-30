@@ -158,8 +158,8 @@
 .registration-upload { display: grid; gap: 8px; margin-bottom: 16px; padding: 14px; border: 1.5px dashed #4a6d93; border-radius: 8px; color: #4a6d93; font-size: 13px; }
 .registration-upload input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 7px; font: inherit; }
 .registration-upload small { color: #e0524f; font-size: 12px; }
-.registration-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 26px; }
-.registration-submit-error { flex: 1 1 100%; margin: 0; color: #c83d39; font-size: 13px; }
+.registration-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 26px; }
+.registration-submit-error { flex: 1 0 100%; margin: 0; padding: 10px 12px; border: 1px solid #f2d2cf; border-radius: 8px; background: #fff7f6; color: #a13f3a; font-size: 12px; line-height: 1.5; }
 .registration-actions button, .registration-success button { min-height: 42px; padding: 11px 24px; border: 0; border-radius: 8px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .registration-actions button:disabled { cursor: wait; opacity: .62; }
 .registration-secondary { background: #f1f1f1; color: #333; }

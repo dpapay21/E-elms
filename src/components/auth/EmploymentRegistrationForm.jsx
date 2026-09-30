@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import landingLogo from "../../assets/877d674005f4.png";
+import LoadingTransition from "./LoadingTransition.jsx";
+import { ACCEPTED_UPLOAD_TYPES, MAX_UPLOAD_SIZE_BYTES, MAX_UPLOAD_SIZE_LABEL } from "../../constants/uploads.js";
 import "./EmploymentRegistrationForm.css";
 
 const PERSONAL_FIELDS = [
@@ -77,28 +79,25 @@ const STEP_TITLES = ["Personal information", "Job information", "Documents", "Sa
 function getSubmissionMessage(error) {
   const code = error?.code || "";
   const message = error?.message || "";
-  if (code === "storage/unauthorized" || code === "permission-denied" || message.toLowerCase().includes("insufficient permissions")) {
-    return "Your registration could not be saved because Firebase denied access. Please ask the administrator to check the Firestore and Storage rules.";
-  }
-  if (code === "storage/bucket-not-found" || code === "storage/unknown") {
-    return "Document storage is not available yet. Please ask the administrator to activate the Firebase Storage bucket and check its configuration.";
+  if (code === "permission-denied" || message.toLowerCase().includes("insufficient permissions")) {
+    return "We couldn’t save your application because your account does not have permission. Your information is still here; please contact support before trying again.";
   }
   if (message.toLowerCase().includes("cloudinary upload is not configured")) {
-    return "Document uploads are not configured yet. Set the Cloudinary cloud name and unsigned upload preset, then restart the app.";
+    return "The document upload service is temporarily unavailable. Your information is still here; please contact support before trying again.";
   }
-  if (code.startsWith("storage/") || message.startsWith("A document could not be uploaded")) {
-    return "A document could not be uploaded. Check your connection and try again.";
-  }
-  if (message.toLowerCase().includes("cloudinary")) {
-    return "A document upload failed. Check the Cloudinary upload settings or try again later.";
+  if (message.toLowerCase().includes("cloudinary") || message.startsWith("A document could not be uploaded")) {
+    return `One of your documents could not be uploaded. Check that each file is a JPG, PNG, or PDF no larger than ${MAX_UPLOAD_SIZE_LABEL}, then try again. Your form information is still here.`;
   }
   if (code === "unauthenticated" || message.toLowerCase().includes("session expired")) {
     return "Your sign-in session has expired. Please sign in again, then submit your registration.";
   }
   if (code === "unavailable" || code === "deadline-exceeded" || code === "network-request-failed") {
-    return "We could not reach the service. Check your internet connection and try again.";
+    return "We couldn’t reach the registration service. Check your internet connection and try again. Your form information is still here.";
   }
-  return "Your registration was not completed. Please try again. If the problem continues, contact the administrator.";
+  if (code === "resource-exhausted") {
+    return "The registration service is busy right now. Wait a moment and try again.";
+  }
+  return "Your registration wasn’t submitted. Your form information is still here; please try again. If it happens again, contact support.";
 }
 
 function Field({ field, value, error, onChange }) {
@@ -175,28 +174,34 @@ export default function EmploymentRegistrationForm({ workStatus, phone = "", ema
   const [photo, setPhoto] = useState("");
   const [photoError, setPhotoError] = useState("");
   const [errors, setErrors] = useState({});
+  const [validationMessage, setValidationMessage] = useState("");
   const [complete, setComplete] = useState(false);
   const [applicationId, setApplicationId] = useState("");
   const [saving, setSaving] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
   const [search, setSearch] = useState("");
+  const [transitionLabel, setTransitionLabel] = useState("");
+  const transitionTimer = useRef(null);
+
+  useEffect(() => () => window.clearTimeout(transitionTimer.current), []);
 
   const change = (name, value) => {
     if (name === "phoneNumber") value = value.replace(/\D/g, "").slice(-9);
     if (["kebele", "houseNumber", "poBox"].includes(name)) value = value.replace(/\D/g, "");
     setValues((current) => ({ ...current, [name]: value }));
     setErrors((current) => ({ ...current, [name]: "" }));
+    setValidationMessage("");
   };
 
   function saveDocuments(key, incomingFiles, multiple = false) {
-    const acceptedTypes = ["image/jpeg", "image/png", "application/pdf"];
-    const validFiles = incomingFiles.filter((file) => acceptedTypes.includes(file.type) && file.size <= 5 * 1024 * 1024);
+    const validFiles = incomingFiles.filter((file) => ACCEPTED_UPLOAD_TYPES.has(file.type) && file.size <= MAX_UPLOAD_SIZE_BYTES);
     if (validFiles.length !== incomingFiles.length) {
-      setErrors((current) => ({ ...current, [key]: "Choose JPG, PNG, or PDF files under 5 MB each." }));
+      setErrors((current) => ({ ...current, [key]: `Choose JPG, PNG, or PDF files no larger than ${MAX_UPLOAD_SIZE_LABEL} each.` }));
       return;
     }
     setFiles((current) => ({ ...current, [key]: multiple ? [...(current[key] || []), ...validFiles] : validFiles[0] }));
     setErrors((current) => ({ ...current, [key]: "" }));
+    setValidationMessage("");
   }
 
   function validateStep() {
@@ -240,18 +245,31 @@ export default function EmploymentRegistrationForm({ workStatus, phone = "", ema
       }
     }
     setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    const valid = Object.keys(nextErrors).length === 0;
+    setValidationMessage(valid ? "" : "Please complete the highlighted required fields before continuing.");
+    if (!valid) {
+      window.requestAnimationFrame(() => {
+        document.querySelector(".registration-field small[role='alert'], .registration-dropzone small[role='alert'], .registration-photo-wrap small[role='alert']")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+    return valid;
   }
 
   async function next() {
     if (!validateStep()) return;
     if (step < STEP_TITLES.length - 1) {
-      setStep((current) => current + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.clearTimeout(transitionTimer.current);
+      setTransitionLabel(`Opening ${STEP_TITLES[step + 1].toLowerCase()}`);
+      transitionTimer.current = window.setTimeout(() => {
+        setStep((current) => current + 1);
+        setTransitionLabel("");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }, 340);
       return;
     }
     const registration = { ...values, workStatus, documents: files };
     setSaving(true);
+    setTransitionLabel("Uploading documents and saving registration");
     setSubmissionError("");
     try {
       if (!onComplete) throw new Error("Registration saving is not configured.");
@@ -263,14 +281,21 @@ export default function EmploymentRegistrationForm({ workStatus, phone = "", ema
       setSubmissionError(getSubmissionMessage(error));
     } finally {
       setSaving(false);
+      setTransitionLabel("");
     }
   }
 
   function previous() {
     if (step > 0) {
-      setStep((current) => current - 1);
       setErrors({});
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      setValidationMessage("");
+      window.clearTimeout(transitionTimer.current);
+      setTransitionLabel(`Returning to ${STEP_TITLES[step - 1].toLowerCase()}`);
+      transitionTimer.current = window.setTimeout(() => {
+        setStep((current) => current - 1);
+        setTransitionLabel("");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }, 340);
     } else {
       onBack?.();
     }
@@ -289,6 +314,7 @@ export default function EmploymentRegistrationForm({ workStatus, phone = "", ema
           <p>Your registration and documents have been saved successfully.{applicationId ? ` Reference: ${applicationId}` : ""}</p>
           <button type="button" className="registration-primary" onClick={onFinish}>Done</button>
         </section>
+        <LoadingTransition label={transitionLabel} />
       </main>
     );
   }
@@ -320,13 +346,14 @@ export default function EmploymentRegistrationForm({ workStatus, phone = "", ema
                       setPhotoError("Upload a JPG or PNG image.");
                       return;
                     }
-                    if (file.size > 5 * 1024 * 1024) {
-                      setPhotoError("Image must be smaller than 5 MB.");
+                    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+                      setPhotoError(`Image must be no larger than ${MAX_UPLOAD_SIZE_LABEL}.`);
                       return;
                     }
                     setPhoto(URL.createObjectURL(file));
                     setFiles((current) => ({ ...current, photo: file }));
                     setErrors((current) => ({ ...current, photo: "" }));
+                    setValidationMessage("");
                     setPhotoError("");
                   }}
                 />
@@ -342,7 +369,7 @@ export default function EmploymentRegistrationForm({ workStatus, phone = "", ema
             <h2 id="address-section" className="registration-section-title">Address</h2>
             {ADDRESS_FIELDS.map((field) => <Field key={field[0]} field={field} value={values[field[0]] || ""} error={errors[field[0]]} onChange={change} />)}
             <div className="registration-warning"><b>!</b><span>Submit valid ID (ID card, passport, or driver’s license) to verify your address. Required for upcoming opportunities.</span></div>
-            <label className="registration-address-upload">Drag and drop an address document here, or click to select<input type="file" accept="image/*,.pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) setFiles((current) => ({ ...current, addressDocument: file })); }} />{files.addressDocument && <small>{files.addressDocument.name}</small>}</label>
+            <label className="registration-address-upload">Drag and drop an address document here, or click to select<input type="file" accept="image/jpeg,image/png,application/pdf" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) saveDocuments("addressDocument", [file]); }} />{files.addressDocument && <small>{files.addressDocument.name}</small>}{errors.addressDocument && <small role="alert">{errors.addressDocument}</small>}</label>
             <h2 id="contact-section" className="registration-section-title">Contact details <button type="button" onClick={() => change("additionalContact", true)} aria-label="Add another contact">+</button></h2>
             {CONTACT_FIELDS.map((field) => <Field key={field[0]} field={field} value={values[field[0]] || ""} error={errors[field[0]]} onChange={change} />)}
             </>}
@@ -390,13 +417,15 @@ export default function EmploymentRegistrationForm({ workStatus, phone = "", ema
         )}
 
         <footer className="registration-actions">
+          {validationMessage && <p className="registration-submit-error" role="alert">{validationMessage}</p>}
           {submissionError && <p className="registration-submit-error" role="alert">{submissionError}</p>}
-          <button type="button" className="registration-secondary" onClick={previous} disabled={saving}>Back</button>
-          <button type="button" className="registration-primary" onClick={next} disabled={saving}>{saving ? "Saving registration…" : step === 3 ? "Complete registration" : "Continue"}</button>
+          <button type="button" className="registration-secondary" onClick={previous} disabled={saving || Boolean(transitionLabel)}>Back</button>
+          <button type="button" className="registration-primary" onClick={next} disabled={saving || Boolean(transitionLabel)}>{saving ? "Saving registration…" : step === 3 ? "Complete registration" : "Continue"}</button>
         </footer>
         </div>
         </div>
       </section>
+      <LoadingTransition label={transitionLabel} />
     </main>
   );
 }

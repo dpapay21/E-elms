@@ -16,6 +16,7 @@ import Hand from '../components/landing/Hand.jsx';
 import Svc from '../components/landing/Svc.jsx';
 import Media from '../components/landing/Media.jsx';
 import Cta from '../components/landing/Cta.jsx';
+import Footer from '../components/landing/Footer.jsx';
 import useLandingInteractions from '../hooks/useLandingInteractions.js';
 
 export default function HomePage() {
@@ -40,6 +41,7 @@ export default function HomePage() {
       <Svc />
       <Media />
       <Cta />
+      <Footer />
     </div>
   );
 }
