@@ -3,6 +3,7 @@ import AuthFlow from './components/auth/AuthFlow.jsx';
 import HomePage from './pages/HomePage.jsx';
 import AdminApp from './admin/AdminApp.jsx';
 import ContentPage from './pages/ContentPage.jsx';
+import AccountPage from './pages/AccountPage.jsx';
 
 const PAGE_METADATA = {
   home: ['E-LMIS – Ethiopian Labor Market Information System', 'Explore Ethiopia’s labor market information, employment services, news, and applicant opportunities through E-LMIS.'],
@@ -14,11 +15,12 @@ const PAGE_METADATA = {
   login: ['Sign in | E-LMIS', 'Sign in to your E-LMIS account to continue your registration or access your account.'],
   register: ['Create an account | E-LMIS', 'Create an E-LMIS account and complete your employment registration.'],
   admin: ['Admin | E-LMIS', 'Authorized E-LMIS administration portal.'],
+  account: ['My account | E-LMIS', 'View your private E-LMIS employment registration and profile information.'],
 };
 
 function updatePageMetadata(page) {
   const [title, description] = PAGE_METADATA[page] || PAGE_METADATA.home;
-  const privatePage = page === 'admin' || page === 'login' || page === 'register';
+  const privatePage = page === 'admin' || page === 'account' || page === 'login' || page === 'register';
   const canonicalUrl = new URL(window.location.pathname, window.location.origin).href;
   document.title = title;
 
@@ -56,6 +58,7 @@ function updatePageMetadata(page) {
 function getPageFromPath(pathname) {
   const path = pathname.replace(/\/+$/, '') || '/';
   if (path === '/admin' || path.startsWith('/admin/')) return 'admin';
+  if (path === '/account') return 'account';
   if (path === '/register') return 'register';
   if (path === '/login') return 'login';
   if (['/services', '/news', '/about', '/contact', '/applicants'].includes(path)) return path.slice(1);
@@ -93,6 +96,7 @@ export default function App() {
 
   if (page !== 'home') {
     if (page === 'admin') return <AdminApp />;
+    if (page === 'account') return <AccountPage />;
     if (['services', 'news', 'about', 'contact', 'applicants'].includes(page)) {
       return <ContentPage page={page} />;
     }

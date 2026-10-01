@@ -47,4 +47,3 @@ Applicants can create and read their own application. Admin access uses a manual
 
 Sign in with the admin email and password to open the protected dashboard; you can also go directly to `/admin`. New registrations appear as `submitted`. Accepting one updates its status and writes a limited public profile to `publicApplicants`, which feeds the landing page's applicant section. Rejecting one marks it `rejected` and removes its public profile. Private application details and Cloudinary document URLs stay in `applications` for admin review and applicant access.
 
-The OTP screen is still a mock and does not send or verify a real SMS code.

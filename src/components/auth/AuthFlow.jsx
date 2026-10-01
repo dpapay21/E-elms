@@ -2,7 +2,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import ministryLogo from "../../assets/ministry-logo.jpg";
 import landingLogo from "../../assets/877d674005f4.png";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../lib/firebase.js";
 import { isConfiguredAdmin } from "../../admin/adminAccess.js";
 import { submitEmploymentApplication } from "../../services/employmentApplications.js";
@@ -34,8 +34,8 @@ import LoadingTransition from "./LoadingTransition.jsx";
  * tiny built-in router at the bottom (AuthFlow) so it runs anywhere,
  * including the Claude preview (no react-router-dom needed):
  *   /login, /register  -> AuthPage (split login/register layout)
- *   /auth/otp-confirmation -> OtpConfirmationPage (plain centered card)
- * A successful Sign Up calls navigate("/auth/otp-confirmation", { state }).
+ *   /registration/next -> WorkStatusStep, then employment details
+ * A successful Sign Up proceeds directly to WorkStatusStep.
  * In a real react-router app, swap AuthFlow for <Route>s and pass
  * useNavigate()/useLocation().state into these two components.
  */
@@ -451,173 +451,19 @@ function RegisterForm({ form, update, blur, shown, showPassword, setShowPassword
   );
 }
 
-// Mock OTP: no code is generated or sent anywhere. Any user can verify
-// with this fixed code. Replace with a real verify-code API call later.
-const MOCK_OTP = "638417";
-
-
-
-function ArrowUpRightIcon(props) {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M7 17L17 7" />
-      <path d="M8 7h9v9" />
-    </svg>
-  );
-}
-
-
-
-function EditPencilIcon(props) {
-  return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
-
-
-/** "Another page" shown right after a successful Sign Up, matching the
- *  lmis.gov.et/auth/otp-confirmation reference design: circular arrow
- *  mark, "We have Sent the Code..." copy, phone number with an edit
- *  affordance, and 6 dash-separated boxes. Uses a fixed mock code
- *  (MOCK_OTP) that auto-fills into the boxes after ~5.5s. Nothing is
- *  generated or sent to the phone. Swap for a real verify-code API
- *  call later. */
-function OtpStep({ phone, onVerified, onEditPhone }) {
-  const otpCode = MOCK_OTP;
-  const [error, setError] = useState("");
-  const [digits, setDigits] = useState(["", "", "", "", "", ""]);
-  const inputRefs = useRef([]);
-
-  React.useEffect(() => {
-    inputRefs.current[0]?.focus();
-    const timers = [];
-
-    // Simulate network delay before the code "arrives" (5-6s).
-    timers.push(
-      setTimeout(() => {
-        otpCode.split("").forEach((digit, i) => {
-          timers.push(
-            setTimeout(() => {
-              setDigits((d) => {
-                const next = [...d];
-                next[i] = digit;
-                return next;
-              });
-            }, i * 150)
-          );
-        });
-      }, 5500)
-    );
-
-    return () => timers.forEach(clearTimeout);
-  }, [otpCode]);
-
-  const filled = digits.every((d) => d !== "");
-
-  function handleVerify() {
-    if (digits.join("") !== MOCK_OTP) {
-      setError("Invalid code. Please try again.");
-      return;
-    }
-    setError("");
-    onVerified();
-  }
-
-  function updateDigit(i, value) {
-    const v = value.replace(/\D/g, "").slice(-1);
-    setDigits((d) => {
-      const next = [...d];
-      next[i] = v;
-      return next;
-    });
-  }
-
-  return (
-    <div className="px-6 py-10 sm:px-10 md:px-12">
-      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
-        <ArrowUpRightIcon style={{ color: BLUE_BTN }} />
-      </div>
-
-      <p className="mb-1 text-center text-sm text-slate-600">
-        We have Sent the Code Verification to your phone number
-      </p>
-      <div className="mb-8 flex items-center justify-center gap-2">
-        <span className="text-sm font-semibold" style={{ color: BLUE_BTN }}>
-          {COUNTRY_CODE}
-          {phone || "960625242"}
-        </span>
-        <button
-          type="button"
-          onClick={onEditPhone}
-          aria-label="Edit phone number"
-          className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500"
-        >
-          <EditPencilIcon />
-        </button>
-      </div>
-
-      <div className="mb-8 flex items-center justify-center gap-1.5 sm:gap-2">
-        {digits.map((d, i) => (
-          <React.Fragment key={i}>
-            <input
-              ref={(el) => (inputRefs.current[i] = el)}
-              value={d}
-              onChange={(e) => updateDigit(i, e.target.value)}
-              inputMode="numeric"
-              maxLength={1}
-              className="h-12 w-10 rounded-md border border-slate-300 text-center text-lg font-semibold text-slate-700 outline-none transition-colors focus:border-blue-500 sm:w-11"
-            />
-            {i < digits.length - 1 && <span className="text-slate-300">-</span>}
-          </React.Fragment>
-        ))}
-      </div>
-
-      {error && <p className="-mt-4 mb-4 text-center text-xs text-red-500">{error}</p>}
-
-      <button
-        type="button"
-        onClick={handleVerify}
-        disabled={!filled}
-        className="w-full rounded-lg py-3 text-sm font-semibold text-white transition-colors disabled:opacity-40"
-        style={{ backgroundColor: BLUE_BTN }}
-        onMouseEnter={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = BLUE_BTN_HOVER)}
-        onMouseLeave={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = BLUE_BTN)}
-      >
-        Verify &amp; Continue
-      </button>
-
-      <hr className="my-8 border-slate-200" />
-      <MinistryLogo />
-      <p className="mt-6 text-left text-[11px] text-slate-400">Version : main</p>
-    </div>
-  );
-}
-
-
-
 /* ---------- page ---------- */
 
-function AuthPage({ navigate, routeState, initialMode }) {
+function AuthPage({ navigate, initialMode }) {
 
-  // When the OTP page's "edit phone" button sends the user back here, it
-  // passes { fromOtp, email, phone } so they land on Register with those
-  // fields restored. Passwords are deliberately NOT carried in router
-  // state (it lives in browser history), so those are re-entered.
-  const returning = routeState?.fromOtp === true;
-
-  const [mode, setMode] = useState(returning ? "signup" : initialMode); // "login" | "signup"
+  const [mode, setMode] = useState(initialMode); // "login" | "signup"
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loginMessage, setLoginMessage] = useState("");
   const [form, setForm] = useState(() => ({
-    email: returning ? routeState.email || "" : "",
-    phone: returning ? routeState.phone || "" : "",
+    email: "",
+    phone: "",
     password: "",
     confirm: "",
   }));
@@ -666,7 +512,7 @@ function AuthPage({ navigate, routeState, initialMode }) {
         if (!auth.currentUser || auth.currentUser.email !== form.email) {
           await createUserWithEmailAndPassword(auth, form.email, form.password);
         }
-        navigate("/auth/otp-confirmation", { state: { phone: form.phone, email: form.email } });
+        navigate("/registration/next", { state: { phone: form.phone, email: form.email } });
       } catch (error) {
         const messages = {
           "auth/email-already-in-use": "An account already exists for this email. Sign in or use a different email.",
@@ -692,12 +538,7 @@ function AuthPage({ navigate, routeState, initialMode }) {
         const normalizedEmail = form.email.trim().toLowerCase();
 
         const credential = await signInWithEmailAndPassword(auth, normalizedEmail, form.password);
-        if (!isConfiguredAdmin(credential.user)) {
-          await signOut(auth);
-          setLoginMessage("This account signed in, but it is not authorized as an administrator.");
-          return;
-        }
-        navigate("/admin");
+        navigate(isConfiguredAdmin(credential.user) ? "/admin" : "/account");
       } catch (error) {
         setLoginMessage(getLoginErrorMessage(error));
       } finally {
@@ -764,27 +605,20 @@ function AuthPage({ navigate, routeState, initialMode }) {
   );
 }
 
-/* ---------- OTP route ---------- */
+/* ---------- registration next step ---------- */
 
-function OtpConfirmationPage({ navigate, routeState }) {
+function RegistrationNextPage({ navigate, routeState }) {
   const phone = routeState?.phone || "";
   const email = routeState?.email || "";
-  const [showWorkStatus, setShowWorkStatus] = useState(false);
   const [workStatus, setWorkStatus] = useState(null);
   const [transitionLabel, setTransitionLabel] = useState("");
   const transitionTimer = useRef(null);
 
   React.useEffect(() => () => window.clearTimeout(transitionTimer.current), []);
 
-  function handleEditPhone() {
-    // carry email + phone back so the Register form isn't wiped
-    navigate("/register", { state: { fromOtp: true, email, phone } });
-  }
-
   function handleWorkStatusDone(status) {
     setTransitionLabel("Opening personal information");
     transitionTimer.current = window.setTimeout(() => {
-      setShowWorkStatus(false);
       setWorkStatus(status);
       setTransitionLabel("");
     }, 360);
@@ -794,15 +628,6 @@ function OtpConfirmationPage({ navigate, routeState }) {
     setTransitionLabel("Returning to work status");
     transitionTimer.current = window.setTimeout(() => {
       setWorkStatus(null);
-      setShowWorkStatus(true);
-      setTransitionLabel("");
-    }, 360);
-  }
-
-  function handleOtpVerified() {
-    setTransitionLabel("Verification complete");
-    transitionTimer.current = window.setTimeout(() => {
-      setShowWorkStatus(true);
       setTransitionLabel("");
     }, 360);
   }
@@ -810,25 +635,22 @@ function OtpConfirmationPage({ navigate, routeState }) {
   if (workStatus) {
     return (
       <>
-      <EmploymentRegistrationForm
-        workStatus={workStatus}
-        phone={phone}
-        email={email}
-        onComplete={submitEmploymentApplication}
-        onBack={returnToWorkStatus}
-        onFinish={() => navigate("/login")}
-      />
-      <LoadingTransition label={transitionLabel} />
+        <EmploymentRegistrationForm
+          workStatus={workStatus}
+          phone={phone}
+          email={email}
+          onComplete={submitEmploymentApplication}
+          onBack={returnToWorkStatus}
+          onFinish={() => navigate("/login")}
+        />
+        <LoadingTransition label={transitionLabel} />
       </>
     );
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 sm:p-6">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <OtpStep phone={phone} onVerified={handleOtpVerified} onEditPhone={handleEditPhone} />
-      </div>
-      {showWorkStatus && <WorkStatusStep onDone={handleWorkStatusDone} />}
+      <WorkStatusStep onDone={handleWorkStatusDone} />
       <LoadingTransition label={transitionLabel} />
     </div>
   );
@@ -845,17 +667,17 @@ export default function AuthFlow({ onExit, initialMode = "login" }) {
 
   const navigate = (path, opts) => {
     window.clearTimeout(transitionTimer.current);
-    if (path === "/admin") {
-      setTransitionLabel("Opening administrator dashboard");
+    if (path === "/admin" || path === "/account") {
+      setTransitionLabel(path === "/admin" ? "Opening administrator dashboard" : "Opening your account");
       transitionTimer.current = window.setTimeout(() => {
-        window.history.pushState({}, "", "/admin");
-        window.dispatchEvent(new CustomEvent("e-elms:navigate", { detail: "/admin" }));
+        window.history.pushState({}, "", path);
+        window.dispatchEvent(new CustomEvent("e-elms:navigate", { detail: path }));
         window.dispatchEvent(new PopStateEvent("popstate"));
         setTransitionLabel("");
       }, 360);
       return;
     }
-    setTransitionLabel(path === "/auth/otp-confirmation" ? "Opening verification" : path === "/login" ? "Finishing registration" : "Returning to registration");
+    setTransitionLabel(path === "/registration/next" ? "Continuing registration" : path === "/login" ? "Finishing registration" : "Returning to registration");
     transitionTimer.current = window.setTimeout(() => {
       setRoute({ path, state: (opts && opts.state) || null });
       setTransitionLabel("");
@@ -864,9 +686,9 @@ export default function AuthFlow({ onExit, initialMode = "login" }) {
 
   return (
     <div className="auth-flow">
-      {route.path === "/auth/otp-confirmation"
-        ? <OtpConfirmationPage navigate={navigate} routeState={route.state} />
-        : <AuthPage navigate={navigate} routeState={route.state} initialMode={initialMode} />}
+      {route.path === "/registration/next"
+        ? <RegistrationNextPage navigate={navigate} routeState={route.state} />
+        : <AuthPage navigate={navigate} initialMode={initialMode} />}
       <LoadingTransition label={transitionLabel} />
     </div>
   );
